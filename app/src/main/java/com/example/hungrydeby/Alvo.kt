@@ -1,5 +1,6 @@
-package com.example.hungrydeby;
-import android.graphics.Paint;
+package com.example.hungrydeby
+import android.graphics.Paint
+import android.graphics.Canvas
 
 class Alvo (
 	var x: Float,
