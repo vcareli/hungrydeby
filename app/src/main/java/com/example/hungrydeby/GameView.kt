@@ -12,12 +12,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     private var isPlaying: Boolean = false
     private var gameThread: Thread? = null
     private var alvo: Alvo? = null
+    private var bird: Bird? = null
     private var paint_bird = Paint()
     private var paint_alvo = Paint()
-    private var bird: Bird? = null
+    private var paint_score = Paint()
     private final var sensibilidade = 0.1f
     private var xInicial = 0f
     private var yInicial = 0f
+    private var score: Int = 0
+    private var life: Int = 5
+    private var estadoAtual: GameState = GameState.MENU
 
     init {
         holder.addCallback(this)
@@ -63,29 +67,58 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     }
 
     private fun render() {
-        // 1. Bloqueamos o Canvas para desenho
         val canvas = holder.lockCanvas()
+        // 1. Bloqueamos o Canvas para desenho
         if (canvas != null) {
-            // Desenhamos coisas no canvas usando o Paint
-            canvas.drawColor(Color.WHITE)
-            paint_alvo.color = Color.RED
-            alvo?.paintAlvo(paint_alvo, canvas)
-            bird?.dessinBird(canvas)
-            // Libera o Canvas e envia para a tela do celular
+            when (estadoAtual) {
+                GameState.JOGANDO -> {
+                    // Desenhamos coisas no canvas usando o Paint
+                    paint_score.color = Color.BLUE   // Define cor do score
+                    paint_score.textSize = 60f      //Define tamanho do scro
+                    canvas.drawText("Score : $score", 0.05f * width, 0.1f * height, paint_score)
+                    canvas.drawText("Vidinhas da Deby : $life", 0.55f * width, 0.1f * height, paint_score)
+                    canvas.drawColor(Color.WHITE)
+                    paint_alvo.color = Color.RED
+                    alvo?.paintAlvo(paint_alvo, canvas)
+                    bird?.dessinBird(canvas)
+                    // Libera o Canvas e envia para a tela do celular
+                }
+                GameState.PAUSADO -> {}
+                GameState.GAME_OVER -> {}
+                GameState.MENU -> {}
+                GameState.VITORIA -> {}
+            }
             holder.unlockCanvasAndPost(canvas)
         }
     }
 
     fun update() {
-        bird?.update()
-        bird?.let { b ->
-            if (b.posX > width || b.posY > height) {
-                b.posX = 0.1f * width
-                b.posY = 0.8f * height
-                b.passarinhoVX = 0f
-                b.passarinhoVY = 0f
-                b.isFlying = false
+        when(estadoAtual) {
+            GameState.JOGANDO -> {
+                bird?.update()
+                bird?.let { b ->
+                    alvo?.let { a ->
+                        if (a.verificaColisao(b)) {
+                            score += 10
+                            a.wasHit = true
+                        }
+                    }
+                    if (b.posX > width || b.posY > height) {
+                        b.posX = 0.1f * width
+                        b.posY = 0.8f * height
+                        b.passarinhoVX = 0f
+                        b.passarinhoVY = 0f
+                        b.isFlying = false
+                        alvo?.reset()
+                        life -= 1
+                        if (life <= 0) {estadoAtual = GameState.GAME_OVER}
+                    }
+                }
             }
+            GameState.PAUSADO -> {}
+            GameState.GAME_OVER -> {}
+            GameState.MENU -> {}
+            GameState.VITORIA -> {}
         }
     }
 
