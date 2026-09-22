@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Paint
 import android.view.MotionEvent
+import androidx.core.content.res.FontResourcesParserCompat
 import kotlin.text.compareTo
 
 class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
@@ -66,6 +67,20 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         }
     }
 
+    private fun restart() {
+        score = 0
+        life = 5
+        xInicial = 0f
+        yInicial = 0f
+        bird?.posX = 0.1f * width
+        bird?.posY = 0.8f * height
+        bird?.passarinhoVX = 0f
+        bird?.passarinhoVY = 0f
+        bird?.isFlying = false
+        alvo?.reset()
+        estadoAtual = GameState.JOGANDO
+    }
+
     private fun render() {
         val canvas = holder.lockCanvas()
         // 1. Bloqueamos o Canvas para desenho
@@ -73,19 +88,35 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
             when (estadoAtual) {
                 GameState.JOGANDO -> {
                     // Desenhamos coisas no canvas usando o Paint
+                    canvas.drawColor(Color.WHITE)
                     paint_score.color = Color.BLUE   // Define cor do score
                     paint_score.textSize = 60f      //Define tamanho do scro
+                    paint_score.textAlign = Paint.Align.LEFT
                     canvas.drawText("Score : $score", 0.05f * width, 0.1f * height, paint_score)
-                    canvas.drawText("Vidinhas da Deby : $life", 0.55f * width, 0.1f * height, paint_score)
-                    canvas.drawColor(Color.WHITE)
+                    canvas.drawText("Vidinhas : ${life}", 0.35f * width, 0.1f * height, paint_score)
                     paint_alvo.color = Color.RED
                     alvo?.paintAlvo(paint_alvo, canvas)
                     bird?.dessinBird(canvas)
                     // Libera o Canvas e envia para a tela do celular
                 }
                 GameState.PAUSADO -> {}
-                GameState.GAME_OVER -> {}
-                GameState.MENU -> {}
+                GameState.GAME_OVER -> {
+                    canvas.drawColor(Color.BLACK)
+                    paint_score.textSize = 100f
+                    var textAlign = Paint.Align.CENTER
+                    paint_score.textAlign = Paint.Align.CENTER
+                    canvas.drawText("Game Over", width / 2f, ((height / 2) - 0.1f * height), paint_score)
+                    paint_score.textSize = 80f
+                    canvas.drawText("Score : $score", width / 2f, ((height / 2) + 0.1f * height), paint_score)
+                }
+                GameState.MENU -> {
+                    canvas.drawColor(Color.WHITE)
+                    paint_score.color = Color.GREEN
+                    paint_score.textSize = 150f
+                    var textAlign = Paint.Align.CENTER
+                    paint_score.textAlign = Paint.Align.CENTER
+                    canvas.drawText("Toque na tela para jogar", width / 2f, ((height / 2) - 0.1f * height), paint_score)
+                }
                 GameState.VITORIA -> {}
             }
             holder.unlockCanvasAndPost(canvas)
@@ -98,25 +129,30 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
                 bird?.update()
                 bird?.let { b ->
                     alvo?.let { a ->
-                        if (a.verificaColisao(b)) {
-                            score += 10
-                            a.wasHit = true
+                        if (b.isFlying == true) {
+                            if (a.verificaColisao(b)) {
+                                score += 10
+                                a.wasHit = true
+                            }
                         }
-                    }
-                    if (b.posX > width || b.posY > height) {
-                        b.posX = 0.1f * width
-                        b.posY = 0.8f * height
-                        b.passarinhoVX = 0f
-                        b.passarinhoVY = 0f
-                        b.isFlying = false
-                        alvo?.reset()
-                        life -= 1
-                        if (life <= 0) {estadoAtual = GameState.GAME_OVER}
+                        if (b.posX > (width + b.raio) || b.posY > (height + b.raio) || b.posX < -b.raio || b.posY < -b.raio) {
+                            if (!a.wasHit) {life -= 1}
+                            b.posX = 0.1f * width
+                            b.posY = 0.8f * height
+                            b.passarinhoVX = 0f
+                            b.passarinhoVY = 0f
+                            b.isFlying = false
+                            alvo?.reset()
+                            if (life <= 0) {
+                                estadoAtual = GameState.GAME_OVER
+                            }
+                        }
                     }
                 }
             }
             GameState.PAUSADO -> {}
-            GameState.GAME_OVER -> {}
+            GameState.GAME_OVER -> {
+            }
             GameState.MENU -> {}
             GameState.VITORIA -> {}
         }
@@ -124,26 +160,48 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     override fun onTouchEvent(event: MotionEvent?): Boolean {
         if (event == null) return false
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                xInicial = event.x
-                yInicial = event.y
-            }
-            MotionEvent.ACTION_MOVE -> {
-                if (event.actionMasked == MotionEvent.ACTION_MOVE) {
-                    bird?.posX = event.x
-                    bird?.posY = event.y
+        when (estadoAtual) {
+            GameState.JOGANDO -> {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        xInicial = event.x
+                        yInicial = event.y
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+                            bird?.posX = event.x
+                            bird?.posY = event.y
+                        }
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        bird?.isFlying = true
+                        val deltaX = event.x - xInicial
+                        val deltaY = event.y - yInicial
+                        bird?.passarinhoVX = -deltaX * sensibilidade
+                        bird?.passarinhoVY = -deltaY * sensibilidade
+                    }
                 }
             }
-            MotionEvent.ACTION_UP -> {
-                bird?.isFlying = true
-                val deltaX = event.x - xInicial
-                val deltaY = event.y - yInicial
-                bird?.passarinhoVX = -deltaX * sensibilidade
-                bird?.passarinhoVY = -deltaY * sensibilidade
+            GameState.GAME_OVER -> {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {}
+                    MotionEvent.ACTION_UP -> {
+                        restart()
+                    }
+                }
             }
+            GameState.MENU -> {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {}
+                    MotionEvent.ACTION_UP -> {
+                        restart()
+                        estadoAtual = GameState.JOGANDO
+                    }
+                }
+            }
+            GameState.VITORIA -> {}
+            GameState.PAUSADO -> {}
         }
-        //return super.onTouchEvent(event)      //retorna falso
         return true
     }
 }
